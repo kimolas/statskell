@@ -3,7 +3,7 @@
 import Control.Monad
 
 -- Density typeclass
-data Density = Density { }
+-- data Density = Density { }
 
 -- Exponential distribution
 dexp :: Double -> Maybe (Double -> Double)
@@ -15,6 +15,16 @@ dexp λ
       | x < 0     = 0
       | otherwise = λ * exp ((-λ) * x)
 
+-- Normal distribution 
+dnorm :: Double -> Double -> Maybe (Double -> Double)
+dnorm μ σ
+  | σ <= 0    = Nothing
+  | otherwise = Just pdf
+  where
+    pdf x = (exp (-(x - μ)^2 / (2 * σ^2))) / (σ * sqrt (2 * pi))
+
+
+-- Numerical integration using midpoint rule
 integral :: Maybe (Double -> Double) -> [Double] -> Maybe Double
 integral d xs = sum <$> pr vs ws
   where
@@ -23,10 +33,10 @@ integral d xs = sum <$> pr vs ws
     vs = (liftM map d) <*> cs
     ws = pw (\x y -> y - x) xs
 
+-- Wrapper function that returns CDF
 cdf d w x = integral d [(-100),(-100+w)..x]
 
-
--- Helper function
+-- Helper function for integrator
 pw :: (a -> a -> a) -> [a] -> Maybe [a]
 pw _ [] = Nothing
 pw _ [x] = Nothing
