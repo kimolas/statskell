@@ -1,44 +1,66 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+
 -- Library for working with distribution functions
 
-import Control.Monad
+-- Numerical integration using midpoint rule
+integral :: [Double] -> (Double -> Double) -> Maybe Double
+integral []  _ = Nothing
+integral [x] _ = Nothing
+integral xs d  = Just $ sum $ zipWith (*) heights widths
+  where
+    pairs = zip xs $ drop 1 xs
+    widths = map (\(x, y) -> y - x) pairs
+    midpoints = map (\(x, y) -> (y + x) / 2) pairs
+    heights = map d midpoints
+
+-- Wrapper function that implements CDF
+-- Should do something more sophisticated than integrating from -100
+cdf :: ParametrizedDensity -> Double -> Double -> Maybe Double
+cdf d w x = d >>= integral [(-100),(-100+w)..x]
+
+
+-- Density functions --
 
 -- Density typeclass
--- data Density = Density { }
+data Density = Density { parameters :: [Double -> Bool]
+                       , support    :: Double -> Bool
+                       , pdf        :: [Double] -> Double -> Double
+                       } deriving ()
+
+data ParametrizedDensity = ParametrizedDensity { support :: Double -> Bool
+                                               , pdf     :: Maybe (Double -> Double)
+                                               } deriving ()
+
+parametrize :: Density -> [Double] -> ParametrizedDensity
+parametrize (Density c s f) p =
+  let pValid = (and [cond par | (cond, par) <- zip c p]) && (length c == length p)
+      pdf
+        | not pValid = Nothing
+        | otherwise  = Just $ f p
+  in ParametrizedDensity s pdf
+
+dEval :: ParametrizedDensity -> Double -> Maybe Double
+dEval (ParametrizedDensity s f) x
+  | not $ s x = Just 0
+  | otherwise = Just $ f x
 
 -- Exponential distribution
-dexp :: Double -> Maybe (Double -> Double)
-dexp λ
-  | λ <= 0    = Nothing
-  | otherwise = Just pdf
+dExp = Density p s pdf
   where
-    pdf x
-      | x < 0     = 0
-      | otherwise = λ * exp ((-λ) * x)
+    p          = [(>= 0)]
+    s          = (>= 0)
+    pdf [λ] x  = λ * exp ((-λ) * x) 
 
 -- Normal distribution 
-dnorm :: Double -> Double -> Maybe (Double -> Double)
-dnorm μ σ
-  | σ <= 0    = Nothing
-  | otherwise = Just pdf
+dNorm = Density p s pdf
   where
-    pdf x = (exp (-(x - μ)^2 / (2 * σ^2))) / (σ * sqrt (2 * pi))
+    p           = [(const True), (>= 0)]
+    s           = const True
+    pdf [μ,σ] x = (exp (-(x - μ)^2 / (2 * σ^2))) / (σ * sqrt (2 * pi))
 
 
--- Numerical integration using midpoint rule
-integral :: Maybe (Double -> Double) -> [Double] -> Maybe Double
-integral d xs = sum <$> pr vs ws
-  where
-    pr = liftM2 $ zipWith (*)
-    cs = pw (\x y -> (x + y) / 2) xs
-    vs = (liftM map d) <*> cs
-    ws = pw (\x y -> y - x) xs
+-- Random variables in Haskell
 
--- Wrapper function that returns CDF
-cdf d w x = integral d [(-100),(-100+w)..x]
-
--- Helper function for integrator
-pw :: (a -> a -> a) -> [a] -> Maybe [a]
-pw _ [] = Nothing
-pw _ [x] = Nothing
-pw f [x,y] = Just [f x y]
-pw f (x:xs) = (liftM (:) (return (f x (head xs)))) `ap` (pw f xs)
+-- data ContinuousRV = ContinuousRV (pdf: 
+-- 
+-- rvX :: ContinuousRV
