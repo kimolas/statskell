@@ -1,0 +1,1 @@
+- Support of a Density might depend on the parameters, e.g. Unif(0, θ)
